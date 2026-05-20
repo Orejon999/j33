@@ -1,0 +1,168 @@
+'use client';
+
+import React, { useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Mail, Lock, Flame, LogIn, ArrowRight } from 'lucide-react';
+import { createClient } from '@/infrastructure/supabase/client';
+import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardContent } from '@/components/ui/Card';
+import { J3Logo } from '@/components/ui/J3Logo';
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const supabase = createClient();
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
+      if (error) {
+        setErrorMessage(error.message === 'Invalid login credentials' 
+          ? 'Usuario o contraseña no válidos.' 
+          : error.message
+        );
+        setIsLoading(false);
+        return;
+      }
+
+      if (data.user) {
+        // Query profile to see role and send to proper route
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profile?.role === 'admin') {
+          router.push('/admin');
+        } else {
+          router.push('/account');
+        }
+      }
+    } catch (err: any) {
+      console.error('Error logging in:', err);
+      setErrorMessage('Ocurrió un error inesperado al iniciar sesión.');
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <main className="min-h-screen bg-brand-dark flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        
+        {/* Brand visual header */}
+        <div className="text-center mb-6 space-y-3 flex flex-col items-center">
+          <J3Logo className="w-36 h-auto" showText={false} />
+          <span className="text-2xl font-black uppercase tracking-widest text-white tracking-tight flex items-center">
+            J3<span className="text-brand-fire">RACKS</span>
+          </span>
+          <p className="text-xs uppercase tracking-widest text-gray-400 font-extrabold flex items-center justify-center gap-1.5">
+            <Flame className="w-3.5 h-3.5 text-brand-fire animate-pulse" />
+            Acceso clientes y administración
+          </p>
+        </div>
+
+        {/* Card envelope */}
+        <Card className="bg-brand-coal border-brand-ash shadow-2xl relative overflow-hidden">
+          {/* Subtle colored top line */}
+          <div className="h-1 bg-gradient-to-r from-brand-fire to-brand-ember absolute inset-x-0 top-0" />
+          
+          <CardHeader className="text-center pt-8">
+            <h2 className="text-3xl font-extrabold uppercase text-white tracking-wide">
+              Iniciar Sesión
+            </h2>
+            <p className="text-xs text-gray-400 font-sans mt-0.5">
+              Ingresa tus credenciales para administrar tus pedidos
+            </p>
+          </CardHeader>
+
+          <CardContent className="space-y-4 pt-4">
+            
+            {/* Fail banner errors */}
+            {errorMessage && (
+              <div className="p-3 bg-brand-ember/15 border border-brand-ember/40 rounded text-xs text-red-100 font-medium font-sans">
+                {errorMessage}
+              </div>
+            )}
+
+            <form onSubmit={handleLogin} className="space-y-4">
+              
+              {/* Email */}
+              <div className="space-y-1.5">
+                <label className="text-xs text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5 text-brand-fire" />
+                  Correo electrónico
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="ej: juan@gmail.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-brand-dark border border-brand-ash rounded px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-fire"
+                />
+              </div>
+
+              {/* Password */}
+              <div className="space-y-1.5 font-sans">
+                <label className="text-xs text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-brand-fire" />
+                  Contraseña
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Min. 6 caracteres"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-brand-dark border border-brand-ash rounded px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-fire font-medium"
+                />
+              </div>
+
+              {/* Action Submit */}
+              <Button
+                type="submit"
+                variant="primary"
+                fullWidth
+                disabled={isLoading}
+                className="flex items-center justify-center gap-2 font-bold uppercase tracking-wider h-11 pointer"
+              >
+                <LogIn className="w-4 h-4" />
+                {isLoading ? 'Ingresando...' : 'INGRESAR'}
+              </Button>
+
+            </form>
+
+            <div className="pt-6 border-t border-brand-ash/50 text-center font-sans space-y-2">
+              <p className="text-xs text-gray-400">
+                ¿No tienes una cuenta J3RACKS aún?
+              </p>
+              <Link 
+                href="/register" 
+                className="text-xs text-brand-fire font-bold uppercase tracking-wider flex items-center justify-center gap-1 group"
+              >
+                Registrarme ahora
+                <ArrowRight className="w-3 h-3 group-hover:translate-x-1 duration-200 transition-transform" />
+              </Link>
+            </div>
+
+          </CardContent>
+        </Card>
+
+      </div>
+    </main>
+  );
+}
