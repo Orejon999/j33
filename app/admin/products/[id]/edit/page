@@ -1,0 +1,127 @@
+'use client';
+
+import React, { use, useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Flame, ArrowLeft, Loader2, ShieldCheck } from 'lucide-react';
+import { createClient } from '@/infrastructure/supabase/client';
+import { Product } from '@/domain/entities';
+import { ProductForm } from '@/components/admin/ProductForm';
+
+interface EditProductPageProps {
+  params: Promise<{ id: string }>;
+}
+
+export default function EditProductAdminPage({ params }: EditProductPageProps) {
+  const router = useRouter();
+  const { id } = use(params);
+
+  const [product, setProduct] = useState<Product | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorText, setErrorText] = useState<string | null>(null);
+
+  // 1. Authenticate user role and fetch target product details
+  useEffect(() => {
+    const fetchSessionAndProduct = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { user }, error } = await supabase.auth.getUser();
+
+        if (error || !user) {
+          router.push('/login');
+          return;
+        }
+
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+
+        if (!prof || prof.role !== 'admin') {
+          router.push('/login');
+          return;
+        }
+
+        setIsAdmin(true);
+
+        // Fetch product specifications
+        const pRes = await fetch(`/api/products/${id}`);
+        if (!pRes.ok) {
+          setErrorText('No se pudo ubicar la parrilla seleccionada.');
+          return;
+        }
+        const pData = await pRes.json();
+        setProduct(pData);
+      } catch (err) {
+        console.error('Error fetching admin edit dependencies:', err);
+        setErrorText('Excepción al cargar detalles del producto.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSessionAndProduct();
+  }, [id, router]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-brand-dark flex flex-col items-center justify-center p-6 text-center">
+        <Loader2 className="w-10 h-10 text-brand-fire animate-spin mb-3" />
+        <p className="text-sm text-gray-400">Recuperando detalles de la parrilla...</p>
+      </div>
+    );
+  }
+
+  if (errorText || !product) {
+    return (
+      <div className="min-h-screen bg-brand-dark flex flex-col items-center justify-center p-6 text-center space-y-4">
+        <h3 className="text-2xl font-bold uppercase text-brand-ember">Error de Edición</h3>
+        <p className="text-sm text-gray-400 font-sans">{errorText || 'Parrilla no encontrada'}</p>
+        <button
+          onClick={() => router.push('/admin')}
+          className="text-xs text-white bg-brand-coal hover:bg-brand-ash border border-brand-ash rounded px-4 py-2 font-bold cursor-pointer"
+        >
+          Regresar a Consola
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-brand-dark py-12 text-white">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        {/* Title banner header */}
+        <div className="border-b border-brand-ash pb-5 mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <span className="text-[10px] uppercase font-bold text-brand-fire tracking-widest flex items-center gap-1.5 leading-none">
+              <ShieldCheck className="w-4 h-4" />
+              Consola del Herrero / Metalúrgico
+            </span>
+            <h1 className="text-4xl font-extrabold uppercase tracking-wide">
+              Modificar <span className="text-brand-fire">Especificaciones</span>
+            </h1>
+            <p className="text-xs text-gray-400 mt-1">
+              Estás modificando el modelo: <strong className="text-white">{product.name}</strong>.
+            </p>
+          </div>
+
+          <button
+            onClick={() => router.push('/admin')}
+            className="text-xs text-gray-400 hover:text-white border border-brand-ash rounded px-3 py-2 uppercase font-bold tracking-wide flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Volver
+          </button>
+        </div>
+
+        {/* Form representation */}
+        <div className="mt-8">
+          <ProductForm product={product} isEdit={true} />
+        </div>
+
+      </div>
+    </main>
+  );
+}
