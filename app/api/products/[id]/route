@@ -1,0 +1,117 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient, createAdminClient } from '@/infrastructure/supabase/server';
+import { SupabaseProductRepository, SupabaseProfileRepository } from '@/infrastructure/supabase/repositories';
+
+// 1. GET /api/products/[id]
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await context.params;
+    const supabase = await createClient();
+    const productRepo = new SupabaseProductRepository(supabase);
+    const product = await productRepo.getProductById(id);
+
+    if (!product) {
+      return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 });
+    }
+
+    return NextResponse.json(product);
+  } catch (error: any) {
+    console.error(`Error fetching product ${request.url}:`, error);
+    return NextResponse.json({ error: error.message || 'Error interno' }, { status: 500 });
+  }
+}
+
+// 2. PUT /api/products/[id] (Admin Protected)
+export async function PUT(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await context.params;
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    const profileRepo = new SupabaseProfileRepository(supabase);
+    const profile = await profileRepo.getProfile(user.id);
+
+    if (!profile || profile.role !== 'admin') {
+      return NextResponse.json({ error: 'Prohibido: Solo administradores' }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { name, description, price, is_visible, category_id, images } = body;
+
+    const adminSupabase = createAdminClient();
+    const adminProductRepo = new SupabaseProductRepository(adminSupabase);
+
+    await adminProductRepo.updateProduct(id, {
+      name,
+      description: description || null,
+      price: price !== undefined ? Number(price) : undefined,
+      is_visible,
+      category_id: category_id || null,
+    }, images);
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error(`Error updating product ${request.url}:`, error);
+    return NextResponse.json({ error: error.message || 'Error interno' }, { status: 500 });
+  }
+}
+
+// 3. DELETE /api/products/[id] (Admin Protected)
+export async function DELETE(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await context.params;
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    const profileRepo = new SupabaseProfileRepository(supabase);
+    const profile = await profileRepo.getProfile(user.id);
+
+    if (!profile || profile.role !== 'admin') {
+      return NextResponse.json({ error: 'Prohibido: Solo administradores' }, { status: 403 });
+    }
+
+    const adminSupabase = createAdminClient();
+
+    // Cascade delete files from 'product-images' bucket folder labeled '[id]'
+    try {
+      const { data: files, error: listError } = await adminSupabase.storage
+        .from('product-images')
+        .list(id);
+
+      if (!listError && files && files.length > 0) {
+        const pathsToDelete = files.map(file => `${id}/${file.name}`);
+        await adminSupabase.storage.from('product-images').remove(pathsToDelete);
+        console.log(`Successfully removed ${pathsToDelete.length} images from storage for product ${id}`);
+      }
+    } catch (storageErr) {
+      console.error('Storage wipe failed during product deletion:', storageErr);
+      // Proceed anyways to clean the SQL base
+    }
+
+    // Delete representation from SQL database (automatically triggers cascading on product_images)
+    const adminProductRepo = new SupabaseProductRepository(adminSupabase);
+    await adminProductRepo.deleteProduct(id);
+
+    return NextResponse.json({ success: true, message: 'Producto e imágenes eliminados con éxito' });
+  } catch (error: any) {
+    console.error(`Error deleting product ${request.url}:`, error);
+    return NextResponse.json({ error: error.message || 'Error interno' }, { status: 500 });
+  }
+}
