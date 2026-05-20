@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+@theme {
+  --font-bebas: var(--font-bebas), sans-serif;
+  --font-sans: var(--font-sans), sans-serif;
+
+  --color-brand-fire: #FAB115;
+  --color-brand-fire-hover: #FFC033;
+  --color-brand-ember: #D48F00;
+  --color-brand-dark: #0d0d0d;
+  --color-brand-coal: #1a1a1a;
+  --color-brand-ash: #262626;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #0d0d0d;
+  color: #f3f4f6;
+  margin: 0;
+  padding: 0;
+}
+
+h1, h2, h3, h4, h5, h6, .brand-font {
+  font-family: var(--font-bebas);
+  letter-spacing: 0.05em;
+}
