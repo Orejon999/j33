@@ -1,0 +1,200 @@
+'use client';
+
+import React, { use, useState, useEffect } from 'react';
+import Link from 'next/link';
+import { ChevronLeft, ShoppingCart, ShieldCheck, Truck, Scale, ArrowLeft } from 'lucide-react';
+import { Product } from '@/domain/entities';
+import { CardStack, CardStackItem } from '@/components/ui/card-stack';
+import { Button } from '@/components/ui/Button';
+import { useCart } from '@/components/shop/CartContext';
+
+interface ProductPageProps {
+  params: Promise<{ id: string }>;
+}
+
+export default function ProductDetailPage({ params }: ProductPageProps) {
+  const { id } = use(params);
+  const { addToCart } = useCart();
+
+  const [product, setProduct] = useState<Product | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchProduct = async () => {
+      try {
+        const res = await fetch(`/api/products/${id}`);
+        if (!res.ok) {
+          if (res.status === 404) {
+            setError('La parrilla buscada no existe en nuestro catálogo');
+          } else {
+            setError('Ocurrió un error al cargar el producto');
+          }
+          return;
+        }
+        const data = await res.json();
+        setProduct(data);
+      } catch (err) {
+        console.error('Error fetching individual product details:', err);
+        setError('No se pudo conectar con el servidor.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchProduct();
+  }, [id]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-brand-dark flex flex-col items-center justify-center p-6">
+        <div className="w-10 h-10 border-4 border-brand-fire border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-sm text-gray-400 capitalize">Cargando especificaciones de la parrilla...</p>
+      </div>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <div className="min-h-screen bg-brand-dark flex flex-col items-center justify-center p-6 text-center space-y-4">
+        <h2 className="text-3xl font-bold uppercase text-brand-fire">Producto no encontrado</h2>
+        <p className="text-sm text-gray-400 max-w-sm">{error || 'El producto seleccionado no está visible'}</p>
+        <Link href="/">
+          <Button variant="secondary" className="mt-4">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Volver a la tienda
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-brand-dark py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        {/* Breadcrumbs / Back button */}
+        <div className="mb-6">
+          <Link 
+            href="/" 
+            className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-brand-fire transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Regresar al catálogo
+          </Link>
+        </div>
+
+        {/* Product Details Columns Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+          
+          {/* Left Column: Swipeable CardStack (Fanning Stack of Images) */}
+          <div className="lg:col-span-7 space-y-4">
+            {product.images && product.images.length > 0 ? (
+              <CardStack
+                items={product.images.map((img, idx) => ({
+                  id: img.id || idx,
+                  title: img.label || `${idx + 1}° Vista oficial`,
+                  description: product.name,
+                  imageSrc: img.url,
+                }))}
+                initialIndex={0}
+                autoAdvance={false}
+                showDots
+                maxVisible={5}
+                cardWidth={560}
+                cardHeight={360}
+              />
+            ) : (
+              <div className="w-full aspect-[16/10] bg-brand-coal flex items-center justify-center rounded border border-brand-ash/55">
+                <span className="text-gray-500 font-medium">Sin imágenes disponibles</span>
+              </div>
+            )}
+            <p className="text-[11px] text-gray-500 uppercase tracking-widest text-center font-bold">
+              Tip: Desliza las cartas lateralmente o usa las flechas para explorar las {product.images?.length || 0} fotos interactivas.
+            </p>
+          </div>
+
+          {/* Right Column: Information Sheet */}
+          <div className="lg:col-span-5 bg-brand-coal border border-brand-ash/60 rounded p-6 md:p-8 space-y-6">
+            
+            {/* Category badge */}
+            {product.category && (
+              <span className="inline-block text-xs uppercase tracking-widest text-brand-fire font-bold bg-brand-fire/10 py-1 px-2.5 rounded border border-brand-fire/20">
+                {product.category.name}
+              </span>
+            )}
+
+            {/* Product Title */}
+            <div className="space-y-1.5">
+              <h1 className="text-4xl md:text-5xl font-black uppercase text-white tracking-wide">
+                {product.name}
+              </h1>
+              <p className="text-xs text-gray-400 font-sans">
+                Código de producto: <span className="font-mono text-gray-300">{product.id.slice(0, 8)}</span>
+              </p>
+            </div>
+
+            {/* Pricing Section */}
+            <div className="py-4 border-y border-brand-ash/50 flex items-center justify-between">
+              <span className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+                Precio Especial
+              </span>
+              <span className="text-3xl font-extrabold text-white">
+                S/ {product.price.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+
+            {/* Product Description */}
+            <div className="space-y-2 font-sans font-medium text-sm text-gray-300 leading-relaxed">
+              <h4 className="text-white font-bold uppercase tracking-wider text-xs">Especificaciones del fabricante</h4>
+              <p>
+                {product.description || 'Parrilla premium J3RACKS fabricada artesanalmente en acero pesado con acabados profesionales de primera calidad. Cuenta con alta eficiencia termodinámica para un asado perfecto a leña o de carbón duro.'}
+              </p>
+            </div>
+
+            {/* Value Checklists */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-400 font-sans py-3 border-t border-brand-ash/40">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-brand-fire shrink-0" />
+                <span>Garantía estructural 1 año</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Truck className="w-4 h-4 text-brand-fire shrink-0" />
+                <span>Envíos a todo el Perú</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Scale className="w-4 h-4 text-brand-fire shrink-0" />
+                <span>Placas de acero pesada</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Scale className="w-4 h-4 text-brand-fire shrink-0" />
+                <span>Personalizable a pedido</span>
+              </div>
+            </div>
+
+            {/* CTA Buy Trigger */}
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              onClick={() => addToCart(product, 1)}
+              className="flex items-center justify-center gap-2 text-md font-bold uppercase"
+              id="product-add-to-cart"
+            >
+              <ShoppingCart className="w-5 h-5" />
+              Agregar al carrito
+            </Button>
+
+            <div className="text-center">
+              <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">
+                ¿Deseas este modelo con cajón o a medida? <a href="https://wa.me/51997444846" target="_blank" rel="noreferrer" className="text-brand-fire underline">Cotízalo aquí</a>.
+              </p>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+    </main>
+  );
+}
