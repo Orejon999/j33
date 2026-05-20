@@ -1,0 +1,87 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Flame, ArrowLeft, Loader2, ShieldCheck } from 'lucide-react';
+import { createClient } from '@/infrastructure/supabase/client';
+import { ProductForm } from '@/components/admin/ProductForm';
+
+export default function NewProductAdminPage() {
+  const router = useRouter();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchSession = async () => {
+      const supabase = createClient();
+      const { data: { user }, error } = await supabase.auth.getUser();
+
+      if (error || !user) {
+        router.push('/login');
+        return;
+      }
+
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      if (!prof || prof.role !== 'admin') {
+        router.push('/login');
+        return;
+      }
+
+      setIsAdmin(true);
+      setIsLoading(false);
+    };
+
+    fetchSession();
+  }, [router]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-brand-dark flex flex-col items-center justify-center p-6 text-center">
+        <Loader2 className="w-10 h-10 text-brand-fire animate-spin mb-3" />
+        <p className="text-sm text-gray-400">Verificando facultades de administración...</p>
+      </div>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-brand-dark py-12 text-white">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        {/* Title banner header */}
+        <div className="border-b border-brand-ash pb-5 mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <span className="text-[10px] uppercase font-bold text-brand-fire tracking-widest flex items-center gap-1.5 leading-none">
+              <ShieldCheck className="w-4 h-4" />
+              Consola del Herrero / Metalúrgico
+            </span>
+            <h1 className="text-4xl font-extrabold uppercase tracking-wide">
+              Forjar Nueva <span className="text-brand-fire">Parrilla</span>
+            </h1>
+            <p className="text-xs text-gray-400 mt-1">
+              Carga las medidas, costos e insértala en el carrusel de la tienda para los clientes.
+            </p>
+          </div>
+
+          <button
+            onClick={() => router.back()}
+            className="text-xs text-gray-400 hover:text-white border border-brand-ash rounded px-3 py-2 uppercase font-bold tracking-wide flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Volver
+          </button>
+        </div>
+
+        {/* Form elements envelope */}
+        <div className="mt-8">
+          <ProductForm />
+        </div>
+
+      </div>
+    </main>
+  );
+}
