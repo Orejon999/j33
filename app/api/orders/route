@@ -1,0 +1,61 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient, createAdminClient } from '@/infrastructure/supabase/server';
+import { SupabaseOrderRepository, SupabaseProfileRepository } from '@/infrastructure/supabase/repositories';
+
+// 1. GET /api/orders (Admin Protected)
+export async function GET(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    const profileRepo = new SupabaseProfileRepository(supabase);
+    const profile = await profileRepo.getProfile(user.id);
+
+    if (!profile || profile.role !== 'admin') {
+      return NextResponse.json({ error: 'Prohibido: Solo administradores' }, { status: 403 });
+    }
+
+    const adminSupabase = createAdminClient();
+    const orderRepo = new SupabaseOrderRepository(adminSupabase);
+    const orders = await orderRepo.getAllOrders();
+
+    return NextResponse.json(orders);
+  } catch (error: any) {
+    console.error('Error fetching orders:', error);
+    return NextResponse.json({ error: error.message || 'Error interno' }, { status: 500 });
+  }
+}
+
+// 2. POST /api/orders (Public / Customer Checkout)
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const body = await request.json();
+    const { items, total } = body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return NextResponse.json({ error: 'La lista de productos del carrito está vacía o es inválida' }, { status: 400 });
+    }
+
+    const adminSupabase = createAdminClient();
+    const orderRepo = new SupabaseOrderRepository(adminSupabase);
+
+    // Save order record
+    const order = await orderRepo.createOrder({
+      user_id: user?.id || null,
+      items,
+      total: Number(total),
+    });
+
+    return NextResponse.json(order, { status: 201 });
+  } catch (error: any) {
+    console.error('Error saving checkout order:', error);
+    return NextResponse.json({ error: error.message || 'Error interno' }, { status: 500 });
+  }
+}
