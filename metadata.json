@@ -1,0 +1,6 @@
+{
+  "name": "J3RACKS",
+  "description": "Tienda online de grills y parrillas de alta calidad",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
