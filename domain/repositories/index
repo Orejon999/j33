@@ -1,0 +1,40 @@
+import { Product, Category, Profile, Order } from '../entities';
+
+export interface ProductRepository {
+  getProducts(filters?: { onlyVisible?: boolean; categoryId?: string; search?: string }): Promise<Product[]>;
+  getProductById(id: string): Promise<Product | null>;
+  createProduct(
+    product: Omit<Product, 'id' | 'created_at' | 'updated_at'>, 
+    images: { url: string; label: string | null; position: number }[]
+  ): Promise<Product>;
+  updateProduct(
+    id: string, 
+    product: Partial<Omit<Product, 'id' | 'created_at' | 'updated_at'>>, 
+    images: { id?: string; url: string; label: string | null; position: number }[]
+  ): Promise<void>;
+  deleteProduct(id: string): Promise<void>;
+  toggleVisibility(id: string, isVisible: boolean): Promise<void>;
+}
+
+export interface CategoryRepository {
+  getCategories(): Promise<Category[]>;
+  createCategory(name: string, slug: string): Promise<Category>;
+  deleteCategory(id: string): Promise<void>;
+}
+
+export interface ProfileRepository {
+  getProfile(id: string): Promise<Profile | null>;
+  updateProfile(id: string, profile: Partial<Omit<Profile, 'id' | 'created_at' | 'role'>>): Promise<void>;
+  getAllProfiles(): Promise<Profile[]>;
+  setProfileRole(id: string, role: 'customer' | 'admin'): Promise<void>;
+}
+
+export interface OrderRepository {
+  createOrder(order: { user_id: string | null; items: any[]; total: number }): Promise<Order>;
+  getAllOrders(): Promise<Order[]>;
+}
+
+export interface SettingsRepository {
+  getSettings(): Promise<Record<string, string>>;
+  updateSetting(key: string, value: string): Promise<void>;
+}
